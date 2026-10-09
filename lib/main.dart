@@ -155,11 +155,15 @@ class _ReportScreenState extends State<ReportScreen> {
   String? _selectedFileName;
 
   void _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _selectedFileName = result.files.single.name;
-      });
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles();
+      if (result != null && result.files.single.path != null) {
+        setState(() {
+          _selectedFileName = result.files.single.name;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking file: $e');
     }
   }
 
