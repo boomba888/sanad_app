@@ -42,3 +42,4 @@ jobs:
         with:
           name: sanad-apk
           path: temp_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          
