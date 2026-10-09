@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "529630162584",
-    "project_id": "sanadapp-3571c",
-    "storage_bucket": "sanadapp-3571c.firebasestorage.app"
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "YOUR_PROJECT_ID",
+    "storage_bucket": "YOUR_PROJECT_ID.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:529630162584:android:06afcf4a2dfbb6062faaed",
+        "mobilesdk_app_id": "1:YOUR_APP_ID:android:HASH",
         "android_client_info": {
           "package_name": "com.sanad.app"
         }
@@ -15,12 +15,24 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCdanBds9LaRnEvOPBu8i_na5y2MsBijU8"
+          "current_key": "YOUR_API_KEY"
         }
       ],
       "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
+        "analytics_service": {
+          "status": 1
+        },
+        "app_measurement_service": {
+          "status": 1
+        },
+        "cloud_messaging_service": {
+          "status": 2
+        },
+        "app_invite_service": {
+          "status": 2
+        },
+        "ads_service": {
+          "status": 2
         }
       }
     }
