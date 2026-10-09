@@ -26,6 +26,7 @@ jobs:
           mkdir temp_app
           cd temp_app
           flutter create . --org com.sanad.app
+          flutter pub add file_picker firebase_core firebase_auth
           cp ../lib/main.dart lib/main.dart
 
       - name: Build APK
