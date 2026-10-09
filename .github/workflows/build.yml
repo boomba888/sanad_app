@@ -25,7 +25,7 @@ jobs:
         run: |
           mkdir temp_app
           cd temp_app
-          flutter create . --org com.sanad.app
+          flutter create . --org com.sanad.app --project-name sanad
           flutter pub add file_picker firebase_core firebase_auth
           cp ../lib/main.dart lib/main.dart
           if [ -f "../android/app/google-services.json" ]; then
