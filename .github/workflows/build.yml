@@ -21,28 +21,20 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Create pubspec.yaml
+      - name: Create Flutter Project & Inject Code
         run: |
-          echo "name: sanad_app" > pubspec.yaml
-          echo "description: Sanad App" >> pubspec.yaml
-          echo "publish_to: 'none'" >> pubspec.yaml
-          echo "environment:" >> pubspec.yaml
-          echo "  sdk: '>=3.0.0 <4.0.0'" >> pubspec.yaml
-          echo "dependencies:" >> pubspec.yaml
-          echo "  flutter:" >> pubspec.yaml
-          echo "    sdk: flutter" >> pubspec.yaml
-          echo "  cupertino_icons: ^1.0.2" >> pubspec.yaml
-          echo "flutter:" >> pubspec.yaml
-          echo "  uses-material-design: true" >> pubspec.yaml
-
-      - name: Get dependencies
-        run: flutter pub get
+          mkdir temp_app
+          cd temp_app
+          flutter create . --org com.sanad.app
+          cp ../lib/main.dart lib/main.dart
 
       - name: Build APK
-        run: flutter build apk --split-per-abi
+        run: |
+          cd temp_app
+          flutter build apk --split-per-abi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: sanad-apk
-          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          path: temp_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
