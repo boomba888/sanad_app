@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase init error: $e');
+  }
   runApp(const SanadApp());
 }
 
@@ -12,226 +19,168 @@ class SanadApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'سند',
+      title: 'Sanad',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.red,
+        primarySwatch: Colors.blue,
         fontFamily: 'Roboto',
       ),
-      home: const PhoneAuthScreen(),
+      home: const AuthScreen(),
     );
   }
 }
 
-// شاشة التحقق من رقم الهاتف
-class PhoneAuthScreen extends StatefulWidget {
-  const PhoneAuthScreen({super.key});
+class AuthScreen extends StatefulWidget {
+  const AuthScreen({super.key});
 
   @override
-  State<PhoneAuthScreen> createState() => _PhoneAuthScreenState();
+  State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
+class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
+  String? _verificationId;
   bool _codeSent = false;
+  bool _isLoading = false;
 
-  void _sendSMS() {
-    if (_phoneController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ادخل رقم الهاتف أولاً')),
-      );
-      return;
-    }
-
-    // هنا يتم ربط إرسال الرسالة عبر Firebase
-    setState(() {
-      _codeSent = true;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('تم إرسال رمز التحقق إلى ${_phoneController.text}')),
+  void _verifyPhone() async {
+    setState(() => _isLoading = true);
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: _phoneController.text.trim(),
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await FirebaseAuth.instance.signInWithCredential(credential);
+        _navigateToReport();
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل التحقق: ${e.message}')),
+        );
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        setState(() {
+          _verificationId = verificationId;
+          _codeSent = true;
+          _isLoading = false;
+        });
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        _verificationId = verificationId;
+      },
     );
   }
 
-  void _verifyCode() {
-    if (_codeController.text.length < 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('أدخل الرمز الصحيح')),
+  void _signInWithCode() async {
+    if (_verificationId == null) return;
+    setState(() => _isLoading = true);
+    try {
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: _codeController.text.trim(),
       );
-      return;
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      _navigateToReport();
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('رمز التحقق غير صحيح')),
+      );
     }
+  }
 
-    // الانتقال لشاشة التبليغ بعد التحقق
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => ReportScreen(phoneNumber: _phoneController.text)),
+  void _navigateToReport() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const ReportScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('التحقق من رقم الهاتف'),
-          backgroundColor: Colors.red[800],
-          centerTitle: true,
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+    return Scaffold(
+      appBar: AppBar(title: const Text('تطبيق سند - التحقق')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (!_codeSent) ...[
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
-                  labelText: 'رقم الهاتف',
-                  hintText: '07XXXXXXXX',
+                  labelText: 'رقم الهاتف (مثال: +213xxxxxxxxx)',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
                 ),
               ),
               const SizedBox(height: 16),
-              if (_codeSent) ...[
-                TextField(
-                  controller: _codeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'رمز التحقق (OTP)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
-                  ),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _verifyPhone,
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text('إرسال رمز SMS'),
+              ),
+            ] else ...[
+              TextField(
+                controller: _codeController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'أدخل الرمز المكون من 6 أرقام',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _verifyCode,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    backgroundColor: Colors.green[700],
-                  ),
-                  child: const Text('تأكيد الرمز والدخول', style: TextStyle(color: Colors.white, fontSize: 16)),
-                ),
-              ] else ...[
-                ElevatedButton(
-                  onPressed: _sendSMS,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    backgroundColor: Colors.red[800],
-                  ),
-                  child: const Text('إرسال رمز التحقق SMS', style: TextStyle(color: Colors.white, fontSize: 16)),
-                ),
-              ]
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _signInWithCode,
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text('تأكيد الرمز والدخول'),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-// شاشة إرسال التبليغ مع إرفاق ملف حقيقي
 class ReportScreen extends StatefulWidget {
-  final String phoneNumber;
-  const ReportScreen({super.key, required this.phoneNumber});
+  const ReportScreen({super.key});
 
   @override
   State<ReportScreen> createState() => _ReportScreenState();
 }
 
 class _ReportScreenState extends State<ReportScreen> {
-  final TextEditingController _detailsController = TextEditingController();
   String? _selectedFileName;
 
-  // ميزة فتح ملفات الهاتف الحقيقية
-  Future<void> _pickRealFile() async {
+  void _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
-
     if (result != null && result.files.single.path != null) {
       setState(() {
         _selectedFileName = result.files.single.name;
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تم إرفاق الملف: $_selectedFileName'),
-          backgroundColor: Colors.green,
-        ),
-      );
     }
-  }
-
-  void _submitReport() {
-    if (_detailsController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى كتابة تفاصيل المشكلة')),
-      );
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم إرسال التبليغ بنجاح!'),
-        backgroundColor: Colors.green,
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('تبليغ عن: ${widget.phoneNumber}'),
-          backgroundColor: Colors.red[800],
-          centerTitle: true,
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              TextField(
-                controller: _detailsController,
-                maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: '...اكتب تفاصيل المشكلة بالتفصيل',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: _pickRealFile,
-                icon: const Icon(Icons.attach_file),
-                label: Text(
-                  _selectedFileName != null
-                      ? 'تم إرفاق: $_selectedFileName'
-                      : 'إرفاق دليل من الهاتف (صورة/ملف)',
-                ),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                  backgroundColor: _selectedFileName != null ? Colors.green[100] : Colors.grey[200],
-                  foregroundColor: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _submitReport,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                  backgroundColor: Colors.red[800],
-                ),
-                child: const Text(
-                  'إرسال التبليغ النهائي',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
+    return Scaffold(
+      appBar: AppBar(title: const Text('تقديم بلاغ - سند')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            ElevatedButton.icon(
+              onPressed: _pickFile,
+              icon: const Icon(Icons.attach_file),
+              label: const Text('إرفاق ملف / صورة من الهاتف'),
+            ),
+            const SizedBox(height: 12),
+            if (_selectedFileName != null)
+              Text('الملف المرفق: $_selectedFileName',
+                  style: const TextStyle(color: Colors.green)),
+          ],
         ),
       ),
     );
