@@ -28,6 +28,9 @@ jobs:
           flutter create . --org com.sanad.app
           flutter pub add file_picker firebase_core firebase_auth
           cp ../lib/main.dart lib/main.dart
+          if [ -f "../android/app/google-services.json" ]; then
+            cp ../android/app/google-services.json android/app/google-services.json
+          fi
 
       - name: Build APK
         run: |
